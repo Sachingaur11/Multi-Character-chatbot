@@ -2,5 +2,5 @@ fastapi
 uvicorn
 groq
 python-dotenv
-streamlit
-requests
+psycopg2-binary
+httpx

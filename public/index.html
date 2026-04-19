@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Character AI Chatbot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0e1117;
+      color: #fafafa;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #161b27;
+      border-right: 1px solid #252d3d;
+      padding: 28px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .sidebar-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #c9d1f0;
+      letter-spacing: 0.3px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12px; font-weight: 600; color: #7a85a3; text-transform: uppercase; letter-spacing: 0.6px; }
+    .field input {
+      padding: 9px 12px;
+      background: #0e1117;
+      border: 1px solid #252d3d;
+      border-radius: 7px;
+      color: #e8eaf6;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: #7c83fd; }
+    .field input::placeholder { color: #3d4460; }
+
+    #startBtn {
+      padding: 11px;
+      background: #7c83fd;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #startBtn:hover:not(:disabled) { background: #6970f5; }
+    #startBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status-msg {
+      font-size: 13px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      display: none;
+    }
+    .status-msg.success { display: block; background: #142a1f; color: #4ade80; }
+    .status-msg.error   { display: block; background: #2a1414; color: #f87171; }
+
+    /* ── Main Area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      background: #161b27;
+      border-bottom: 1px solid #252d3d;
+      font-size: 16px;
+      font-weight: 600;
+      color: #c9d1f0;
+      flex-shrink: 0;
+    }
+
+    /* ── Messages ── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      scroll-behavior: smooth;
+    }
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: #252d3d; border-radius: 10px; }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #3d4460;
+    }
+    .empty-state .icon { font-size: 52px; }
+    .empty-state p { font-size: 15px; }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      max-width: 78%;
+    }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .message.assistant { align-self: flex-start; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .message.user .avatar      { background: #7c83fd; }
+    .message.assistant .avatar { background: #252d3d; }
+
+    .bubble {
+      padding: 11px 15px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.65;
+      word-break: break-word;
+      white-space: pre-wrap;   /* preserve newlines from streamed text */
+    }
+    .message.user .bubble {
+      background: #7c83fd;
+      color: #fff;
+      border-radius: 14px 14px 4px 14px;
+    }
+    .message.assistant .bubble {
+      background: #1c2236;
+      color: #dde2f5;
+      border-radius: 14px 14px 14px 4px;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-dots {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      padding: 12px 15px;
+      background: #1c2236;
+      border-radius: 14px 14px 14px 4px;
+    }
+    .typing-dots span {
+      width: 7px;
+      height: 7px;
+      background: #7c83fd;
+      border-radius: 50%;
+      animation: dot-bounce 1.3s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-7px); }
+    }
+
+    /* ── Input Bar ── */
+    .input-bar {
+      padding: 14px 24px;
+      background: #161b27;
+      border-top: 1px solid #252d3d;
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .input-bar input {
+      flex: 1;
+      padding: 11px 15px;
+      background: #0e1117;
+      border: 1px solid #252d3d;
+      border-radius: 8px;
+      color: #e8eaf6;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-bar input:focus { border-color: #7c83fd; }
+    .input-bar input::placeholder { color: #3d4460; }
+    .input-bar input:disabled { opacity: 0.4; }
+
+    .input-bar button {
+      padding: 11px 20px;
+      background: #7c83fd;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .input-bar button:hover:not(:disabled) { background: #6970f5; }
+    .input-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-title">🎭 Start Chatting</div>
+
+    <div class="field">
+      <label>Your Name</label>
+      <input id="userName" type="text" placeholder="e.g. Alex" />
+    </div>
+
+    <div class="field">
+      <label>Your Email</label>
+      <input id="userEmail" type="email" placeholder="e.g. alex@example.com" />
+    </div>
+
+    <div class="field">
+      <label>Character</label>
+      <input id="character" type="text" placeholder="e.g. Elon Musk, Pirate…" />
+    </div>
+
+    <button id="startBtn" onclick="startSession()">Start Chat</button>
+
+    <div id="statusMsg" class="status-msg"></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="chat-header" id="chatHeader">Multi-Character AI Chatbot</div>
+
+    <div class="messages" id="messages">
+      <div class="empty-state">
+        <div class="icon">🎭</div>
+        <p>Create a session from the sidebar to start chatting.</p>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <input
+        id="userInput"
+        type="text"
+        placeholder="Type your message…"
+        disabled
+        onkeydown="handleKey(event)"
+      />
+      <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+    </div>
+  </div>
+
+  <script>
+    let currentSession = null;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    function showStatus(text, type) {
+      const el = document.getElementById('statusMsg');
+      el.textContent = text;
+      el.className = 'status-msg' + (type ? ' ' + type : '');
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+    }
+
+    function scrollBottom() {
+      const el = document.getElementById('messages');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function appendMessage(role, content) {
+      const area = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.className = 'message ' + role;
+      const emoji = role === 'user' ? '👤' : '🎭';
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = emoji;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = content;   // textContent is XSS-safe
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+      area.appendChild(wrap);
+      scrollBottom();
+    }
+
+    // Creates an empty assistant bubble and returns the bubble element so
+    // tokens can be appended into it as they stream in.
+    function createStreamingBubble() {
+      const area = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.className = 'message assistant';
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = '🎭';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+      area.appendChild(wrap);
+      scrollBottom();
+      return bubble;
+    }
+
+    function showTyping() {
+      const area = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.className = 'message assistant';
+      wrap.id = 'typingIndicator';
+      wrap.innerHTML = `
+        <div class="avatar">🎭</div>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      `;
+      area.appendChild(wrap);
+      scrollBottom();
+    }
+
+    function hideTyping() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    function setInputEnabled(on) {
+      document.getElementById('userInput').disabled = !on;
+      document.getElementById('sendBtn').disabled = !on;
+    }
+
+    // ── Start session ─────────────────────────────────────────────────────
+
+    async function startSession() {
+      const name      = document.getElementById('userName').value.trim();
+      const email     = document.getElementById('userEmail').value.trim();
+      const character = document.getElementById('character').value.trim();
+
+      if (!name || !email || !character) {
+        showStatus('Please fill in all three fields.', 'error');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showStatus('Please enter a valid email address.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+      showStatus('', '');
+
+      try {
+        const res = await fetch('/api/create-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, character }),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'created') {
+          // session_id is assigned by the server — store it locally
+          currentSession = { id: data.session_id, character: data.character, name };
+          showStatus(`Hi ${name}! Session started with ${character}.`, 'success');
+          document.getElementById('chatHeader').textContent = `${name} × ${character}`;
+          document.getElementById('messages').innerHTML = '';
+          setInputEnabled(true);
+          document.getElementById('userInput').focus();
+        } else {
+          showStatus(data.detail || 'Failed to create session.', 'error');
+        }
+      } catch {
+        showStatus('Network error. Please try again.', 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Start Chat';
+    }
+
+    // ── Send message ──────────────────────────────────────────────────────
+
+    async function sendMessage() {
+      if (!currentSession) return;
+      const input = document.getElementById('userInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      input.value = '';
+      setInputEnabled(false);
+      appendMessage('user', msg);
+      showTyping();
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSession.id, message: msg }),
+        });
+
+        if (!res.ok || !res.body) {
+          hideTyping();
+          appendMessage('assistant', 'Something went wrong.');
+          setInputEnabled(true);
+          document.getElementById('userInput').focus();
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let bubble = null;
+        let accumulated = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE lines are separated by '\n\n'; split on newlines and process
+          const lines = buffer.split('\n');
+          buffer = lines.pop();  // last (possibly incomplete) chunk stays in buffer
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            let parsed;
+            try { parsed = JSON.parse(line.slice(6)); } catch { continue; }
+
+            if (parsed.token) {
+              // First token → swap typing indicator for a real bubble
+              if (!bubble) {
+                hideTyping();
+                bubble = createStreamingBubble();
+              }
+              accumulated += parsed.token;
+              bubble.textContent = accumulated;
+              scrollBottom();
+            } else if (parsed.error) {
+              hideTyping();
+              appendMessage('assistant', parsed.error);
+            }
+          }
+        }
+
+        // Fallback if stream ended without any tokens
+        if (!bubble) {
+          hideTyping();
+          appendMessage('assistant', '…');
+        }
+
+      } catch {
+        hideTyping();
+        appendMessage('assistant', 'Network error. Please try again.');
+      }
+
+      setInputEnabled(true);
+      document.getElementById('userInput').focus();
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+  </script>
+</body>
+</html>
