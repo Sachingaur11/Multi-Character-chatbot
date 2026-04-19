@@ -11,7 +11,7 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #0e1117;
       color: #fafafa;
-      height: 100vh;
+      height: 100dvh; /* dvh tracks visible area — stays correct when mobile keyboard opens */
       display: flex;
       overflow: hidden;
     }
@@ -26,6 +26,8 @@
       display: flex;
       flex-direction: column;
       gap: 18px;
+      transition: transform 0.25s ease;
+      z-index: 100;
     }
     .sidebar-title {
       font-size: 17px;
@@ -41,7 +43,7 @@
       border: 1px solid #252d3d;
       border-radius: 7px;
       color: #e8eaf6;
-      font-size: 14px;
+      font-size: 16px; /* 16px prevents iOS auto-zoom on focus */
       outline: none;
       transition: border-color 0.15s;
     }
@@ -71,33 +73,71 @@
     .status-msg.success { display: block; background: #142a1f; color: #4ade80; }
     .status-msg.error   { display: block; background: #2a1414; color: #f87171; }
 
+    /* ── Sidebar overlay backdrop (mobile only) ── */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 99;
+    }
+    .sidebar-backdrop.visible { display: block; }
+
     /* ── Main Area ── */
     .main {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-width: 0;
     }
 
     .chat-header {
-      padding: 16px 24px;
+      padding: 14px 16px;
       background: #161b27;
       border-bottom: 1px solid #252d3d;
       font-size: 16px;
       font-weight: 600;
       color: #c9d1f0;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Hamburger button — hidden on desktop, shown on mobile */
+    #menuBtn {
+      display: none;
+      background: none;
+      border: none;
+      color: #c9d1f0;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    #menuBtn:active { background: #252d3d; }
+
+    #chatHeaderText {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* ── Messages ── */
     .messages {
       flex: 1;
       overflow-y: auto;
-      padding: 28px 24px;
+      padding: 24px 20px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
       scroll-behavior: smooth;
+      /* allow content to scroll under iOS home indicator */
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
     }
     .messages::-webkit-scrollbar { width: 5px; }
     .messages::-webkit-scrollbar-track { background: transparent; }
@@ -113,24 +153,24 @@
       color: #3d4460;
     }
     .empty-state .icon { font-size: 52px; }
-    .empty-state p { font-size: 15px; }
+    .empty-state p { font-size: 15px; text-align: center; }
 
     .message {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       max-width: 78%;
     }
     .message.user { align-self: flex-end; flex-direction: row-reverse; }
     .message.assistant { align-self: flex-start; }
 
     .avatar {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 15px;
+      font-size: 14px;
       flex-shrink: 0;
       margin-top: 2px;
     }
@@ -138,12 +178,12 @@
     .message.assistant .avatar { background: #252d3d; }
 
     .bubble {
-      padding: 11px 15px;
+      padding: 10px 14px;
       border-radius: 14px;
       font-size: 14px;
       line-height: 1.65;
       word-break: break-word;
-      white-space: pre-wrap;   /* preserve newlines from streamed text */
+      white-space: pre-wrap;
     }
     .message.user .bubble {
       background: #7c83fd;
@@ -181,30 +221,32 @@
 
     /* ── Input Bar ── */
     .input-bar {
-      padding: 14px 24px;
+      padding: 10px 16px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
       background: #161b27;
       border-top: 1px solid #252d3d;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-shrink: 0;
     }
     .input-bar input {
       flex: 1;
-      padding: 11px 15px;
+      padding: 11px 14px;
       background: #0e1117;
       border: 1px solid #252d3d;
       border-radius: 8px;
       color: #e8eaf6;
-      font-size: 14px;
+      font-size: 16px; /* 16px prevents iOS auto-zoom on focus */
       outline: none;
       transition: border-color 0.15s;
+      min-width: 0;
     }
     .input-bar input:focus { border-color: #7c83fd; }
     .input-bar input::placeholder { color: #3d4460; }
     .input-bar input:disabled { opacity: 0.4; }
 
     .input-bar button {
-      padding: 11px 20px;
+      padding: 11px 18px;
       background: #7c83fd;
       color: #fff;
       border: none;
@@ -214,15 +256,45 @@
       cursor: pointer;
       transition: background 0.15s, opacity 0.15s;
       white-space: nowrap;
+      flex-shrink: 0;
     }
     .input-bar button:hover:not(:disabled) { background: #6970f5; }
     .input-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Mobile styles ── */
+    @media (max-width: 640px) {
+      #menuBtn { display: block; }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100dvh;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        /* safe-area padding for notch / rounded corners */
+        padding-top: max(28px, env(safe-area-inset-top));
+        padding-left: max(18px, env(safe-area-inset-left));
+      }
+      .sidebar.open { transform: translateX(0); }
+
+      .message { max-width: 88%; }
+
+      .messages { padding: 16px 12px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+      .input-bar { padding: 8px 12px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+
+      .chat-header { padding: 12px 12px; }
+    }
   </style>
 </head>
 <body>
 
+  <!-- Backdrop (mobile only) -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-title">🎭 Start Chatting</div>
 
     <div class="field">
@@ -247,7 +319,10 @@
 
   <!-- Main -->
   <div class="main">
-    <div class="chat-header" id="chatHeader">Multi-Character AI Chatbot</div>
+    <div class="chat-header">
+      <button id="menuBtn" onclick="toggleSidebar()" aria-label="Open menu">&#9776;</button>
+      <span id="chatHeaderText">Multi-Character AI Chatbot</span>
+    </div>
 
     <div class="messages" id="messages">
       <div class="empty-state">
@@ -270,6 +345,21 @@
 
   <script>
     let currentSession = null;
+
+    // ── Sidebar toggle (mobile) ───────────────────────────────────────────
+
+    function toggleSidebar() {
+      const sidebar  = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      const isOpen   = sidebar.classList.contains('open');
+      sidebar.classList.toggle('open', !isOpen);
+      backdrop.classList.toggle('visible', !isOpen);
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarBackdrop').classList.remove('visible');
+    }
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -383,9 +473,10 @@
           // session_id is assigned by the server — store it locally
           currentSession = { id: data.session_id, character: data.character, name };
           showStatus(`Hi ${name}! Session started with ${character}.`, 'success');
-          document.getElementById('chatHeader').textContent = `${name} × ${character}`;
+          document.getElementById('chatHeaderText').textContent = `${name} × ${character}`;
           document.getElementById('messages').innerHTML = '';
           setInputEnabled(true);
+          closeSidebar();
           document.getElementById('userInput').focus();
         } else {
           showStatus(data.detail || 'Failed to create session.', 'error');
